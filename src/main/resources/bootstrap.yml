@@ -1,0 +1,4 @@
+spring:
+  cloud:
+    config:
+      uri: http://omicsdi-ddi-cloud-config:8888
