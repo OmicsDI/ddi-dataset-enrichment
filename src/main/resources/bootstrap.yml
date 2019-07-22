@@ -2,3 +2,5 @@ spring:
   cloud:
     config:
       uri: http://omicsdi-ddi-cloud-config:8888
+  profiles:
+    active: production
