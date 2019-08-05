@@ -17,9 +17,8 @@ import uk.ac.ebi.ddi.task.ddidatasetenrichment.models.EnrichedDataset;
 import uk.ac.ebi.ddi.task.ddidatasetenrichment.services.EnrichmentService;
 import uk.ac.ebi.ddi.task.ddidatasetenrichment.utils.EnrichmentUtils;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ForkJoinPool;
 
 import static uk.ac.ebi.ddi.ddidomaindb.dataset.DSField.Additional.*;
 
@@ -35,6 +34,10 @@ public class DdiDatasetEnrichmentApplication implements CommandLineRunner {
     @Autowired
     private DatasetEnrichmentTaskProperties properties;
 
+    private static final int LOG_EVERY_N_RECORD = 500;
+
+    private static final int PARALLEL = Math.min(2, Runtime.getRuntime().availableProcessors());
+
     private static final Logger LOGGER = LoggerFactory.getLogger(DdiDatasetEnrichmentApplication.class);
 
     public static void main(String[] args) {
@@ -43,14 +46,24 @@ public class DdiDatasetEnrichmentApplication implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        datasetService.readDatasetHashCode(properties.getDatabaseName())
-                .stream()
+        List<Dataset> datasets = datasetService.readDatasetHashCode(properties.getDatabaseName());
+        ForkJoinPool customThreadPool = new ForkJoinPool(PARALLEL);
+        List<String> processed = new ArrayList<>();
+        customThreadPool.submit(() -> datasets.stream()
                 .filter(x -> x.getCurrentStatus().equalsIgnoreCase(DatasetCategory.INSERTED.getType()) ||
                         x.getCurrentStatus().equalsIgnoreCase(DatasetCategory.UPDATED.getType()))
-                .forEach(this::process);
+                .forEach(x -> this.process(x, processed, datasets.size()))
+        ).get();
     }
 
-    private void process(Dataset datasetShort) {
+    private synchronized void showLog(String accession, List<String> processed, int total) {
+        processed.add(accession);
+        if (processed.size() % LOG_EVERY_N_RECORD == 0) {
+            LOGGER.info("Processed {}/{}", processed.size(), total);
+        }
+    }
+
+    private void process(Dataset datasetShort, List<String> processed, int total) {
         try {
             Dataset dataset = datasetService.read(datasetShort.getAccession(), datasetShort.getDatabase());
             Map<String, String> fields = new HashMap<>();
@@ -81,6 +94,7 @@ public class DdiDatasetEnrichmentApplication implements CommandLineRunner {
                 dataset.setCurrentStatus(DatasetCategory.ENRICHED.getType());
             }
             datasetService.update(dataset.getId(), dataset);
+            showLog(dataset.getAccession(), processed, total);
 
         } catch (Exception e) {
             LOGGER.error("Exception occurred when processing dataset {},", datasetShort.getAccession(), e);
