@@ -7,6 +7,8 @@ public class DatasetEnrichmentTaskProperties {
 
     private String databaseName;
 
+    private boolean force = false;
+
     private boolean overwrite = false;
 
     public String getDatabaseName() {
@@ -25,10 +27,19 @@ public class DatasetEnrichmentTaskProperties {
         this.overwrite = overwrite;
     }
 
+    public boolean isForce() {
+        return force;
+    }
+
+    public void setForce(boolean force) {
+        this.force = force;
+    }
+
     @Override
     public String toString() {
         return "DatasetEnrichmentTaskProperties{" +
                 "databaseName='" + databaseName + '\'' +
+                ", force=" + force +
                 ", overwrite=" + overwrite +
                 '}';
     }
