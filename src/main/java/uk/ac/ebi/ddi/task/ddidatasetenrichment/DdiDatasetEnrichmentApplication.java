@@ -19,6 +19,7 @@ import uk.ac.ebi.ddi.task.ddidatasetenrichment.utils.EnrichmentUtils;
 
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
+import java.util.stream.Collectors;
 
 import static uk.ac.ebi.ddi.ddidomaindb.dataset.DSField.Additional.*;
 
@@ -44,16 +45,22 @@ public class DdiDatasetEnrichmentApplication implements CommandLineRunner {
         SpringApplication.run(DdiDatasetEnrichmentApplication.class, args);
     }
 
+    public boolean isDatasetNeedToEnrich(Dataset dataset) {
+        return dataset.getCurrentStatus().equals(DatasetCategory.ANNOTATED.getType())
+                || dataset.getCurrentStatus().equals(DatasetCategory.INSERTED.getType())
+                || dataset.getCurrentStatus().equals(DatasetCategory.UPDATED.getType())
+                || properties.isForce();
+    }
+
     @Override
     public void run(String... args) throws Exception {
-        List<Dataset> datasets = datasetService.readDatasetHashCode(properties.getDatabaseName());
+        List<Dataset> datasets = datasetService.readDatasetHashCode(properties.getDatabaseName())
+                .stream()
+                .filter(this::isDatasetNeedToEnrich)
+                .collect(Collectors.toList());
         ForkJoinPool customThreadPool = new ForkJoinPool(PARALLEL);
         List<String> processed = new ArrayList<>();
-        customThreadPool.submit(() -> datasets.stream()
-                .filter(x -> x.getCurrentStatus().equalsIgnoreCase(DatasetCategory.INSERTED.getType()) ||
-                        x.getCurrentStatus().equalsIgnoreCase(DatasetCategory.UPDATED.getType()))
-                .forEach(x -> this.process(x, processed, datasets.size()))
-        ).get();
+        customThreadPool.submit(() -> datasets.forEach(x -> process(x, processed, datasets.size()))).get();
     }
 
     private synchronized void showLog(String accession, List<String> processed, int total) {
