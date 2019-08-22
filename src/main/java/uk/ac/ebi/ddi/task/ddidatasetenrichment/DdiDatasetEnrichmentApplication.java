@@ -18,7 +18,6 @@ import uk.ac.ebi.ddi.task.ddidatasetenrichment.services.EnrichmentService;
 import uk.ac.ebi.ddi.task.ddidatasetenrichment.utils.EnrichmentUtils;
 
 import java.util.*;
-import java.util.concurrent.ForkJoinPool;
 import java.util.stream.Collectors;
 
 import static uk.ac.ebi.ddi.ddidomaindb.dataset.DSField.Additional.*;
@@ -36,8 +35,6 @@ public class DdiDatasetEnrichmentApplication implements CommandLineRunner {
     private DatasetEnrichmentTaskProperties properties;
 
     private static final int LOG_EVERY_N_RECORD = 500;
-
-    private static final int PARALLEL = Math.min(2, Runtime.getRuntime().availableProcessors());
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DdiDatasetEnrichmentApplication.class);
 
@@ -58,9 +55,9 @@ public class DdiDatasetEnrichmentApplication implements CommandLineRunner {
                 .stream()
                 .filter(this::isDatasetNeedToEnrich)
                 .collect(Collectors.toList());
-        ForkJoinPool customThreadPool = new ForkJoinPool(PARALLEL);
+        Collections.shuffle(datasets);  // For parallel computing
         List<String> processed = new ArrayList<>();
-        customThreadPool.submit(() -> datasets.forEach(x -> process(x, processed, datasets.size()))).get();
+        datasets.forEach(x -> process(x, processed, datasets.size()));
     }
 
     private synchronized void showLog(String accession, List<String> processed, int total) {
@@ -72,6 +69,11 @@ public class DdiDatasetEnrichmentApplication implements CommandLineRunner {
 
     private void process(Dataset datasetShort, List<String> processed, int total) {
         try {
+            if (!isDatasetNeedToEnrich(datasetShort)) {
+                // We check this function once again to avoid repeat working on a same dataset
+                // When running this in parallel
+                return;
+            }
             Dataset dataset = datasetService.read(datasetShort.getAccession(), datasetShort.getDatabase());
             Map<String, String> fields = new HashMap<>();
             fields.put(DSField.NAME.getName(), dataset.getName());
@@ -101,10 +103,11 @@ public class DdiDatasetEnrichmentApplication implements CommandLineRunner {
                 dataset.setCurrentStatus(DatasetCategory.ENRICHED.getType());
             }
             datasetService.update(dataset.getId(), dataset);
-            showLog(dataset.getAccession(), processed, total);
 
         } catch (Exception e) {
             LOGGER.error("Exception occurred when processing dataset {},", datasetShort.getAccession(), e);
+        } finally {
+            showLog(datasetShort.getAccession(), processed, total);
         }
     }
 }
