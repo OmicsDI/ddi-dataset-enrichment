@@ -57,7 +57,6 @@ public class EnrichmentService {
         String database = dataset.getDatabase();
 
         EnrichedDataset enrichedDataset = new EnrichedDataset(accession, database);
-        DatasetEnrichmentInfo datasetEnrichmentInfo = new DatasetEnrichmentInfo(accession, database);
         DatasetEnrichmentInfo prevDs = enrichmentInfoService.getLatest(accession, database);
 
         Map<String, List<WordInField>> synonyms = new HashMap<>();
@@ -81,6 +80,7 @@ public class EnrichmentService {
             }
         }
 
+        DatasetEnrichmentInfo datasetEnrichmentInfo = new DatasetEnrichmentInfo(accession, database);
         datasetEnrichmentInfo.setSynonyms(synonyms);
         datasetEnrichmentInfo.setEnrichTime(new Date());
 
