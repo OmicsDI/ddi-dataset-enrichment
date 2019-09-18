@@ -69,12 +69,12 @@ public class DdiDatasetEnrichmentApplication implements CommandLineRunner {
 
     private void process(Dataset datasetShort, List<String> processed, int total) {
         try {
-            if (!isDatasetNeedToEnrich(datasetShort)) {
+            Dataset dataset = datasetService.read(datasetShort.getAccession(), datasetShort.getDatabase());
+            if (!isDatasetNeedToEnrich(dataset)) {
                 // We check this function once again to avoid repeat working on a same dataset
                 // When running this in parallel
                 return;
             }
-            Dataset dataset = datasetService.read(datasetShort.getAccession(), datasetShort.getDatabase());
             Map<String, String> fields = new HashMap<>();
             fields.put(DSField.NAME.getName(), dataset.getName());
             fields.put(DSField.DESCRIPTION.getName(), dataset.getDescription());
